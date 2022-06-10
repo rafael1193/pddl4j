@@ -30,6 +30,8 @@ import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.LoggerConfig;
 import picocli.CommandLine;
 
+import com.thoughtworks.xstream.XStream;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -40,6 +42,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -154,9 +157,19 @@ public final class Parser implements Callable<Integer> {
     private File domainFile;
 
     /**
+     * The XML exported domain file.
+     */
+    private File domainExportFile;
+
+    /**
      * The problem file.
      */
     private File problemFile;
+
+    /**
+     * The XML exported problem file.
+     */
+    private File problemExportFile;
 
     /**
      * Create a new <code>Parser</code>.
@@ -202,6 +215,44 @@ public final class Parser implements Callable<Integer> {
      */
     public final File getProblemFile() {
         return this.problemFile;
+    }
+
+    /**
+     * Sets the file to export the domain in XML.
+     *
+     * @param domain the file to export the domain in XML.
+     */
+    @CommandLine.Parameters(index = "2", description = "The domain export file.")
+    public final void setDomainExportFile(final File domain) {
+        this.domainExportFile = domain;
+    }
+
+    /**
+     * Returns the file to export the domain in XML.
+     *
+     * @return the file to export the domain in XML.
+     */
+    public final File getDomainExportFile() {
+        return this.domainExportFile;
+    }
+
+    /**
+     * Sets the file to export the problem in XML.
+     *
+     * @param domain the file to export the problem in XML.
+     */
+    @CommandLine.Parameters(index = "3", description = "The problem export file.")
+    public final void setProblemExportFile(final File domain) {
+        this.problemExportFile = domain;
+    }
+
+    /**
+     * Returns the file to export the problem in XML.
+     *
+     * @return the file to export the problem in XML.
+     */
+    public final File getProblemExportFile() {
+        return this.problemExportFile;
     }
 
     /**
@@ -2163,6 +2214,38 @@ public final class Parser implements Callable<Integer> {
     }
 
     /**
+     * Export a planning domain and a planning problem to XML files.
+     *
+     * @param domain  the file that contains the planning domains.
+     * @param problem the file that contains the planning problem.
+     * @param domainFile the file to export planning problem.
+     * @param problemFile the file to export the planning problem.
+     * @throws FileNotFoundException if the specified domain or problem file does not exist.
+     */
+    public void export(ParsedDomain domain, ParsedProblem problem, File domainFile, File problemFile) throws FileNotFoundException {
+        XStream xstream = new XStream();
+
+        try(FileOutputStream domainFOS = new FileOutputStream(domainFile)){
+            domainFOS.write("<?xml version=\"1.0\"?>\n".getBytes(StandardCharsets.UTF_8));
+            xstream.toXML(domain, domainFOS);
+        }catch (Exception e){
+            System.err.println("Error in XML Write: " + e.getMessage());
+        }
+
+        try(FileOutputStream problemFOS = new FileOutputStream(problemFile)){
+            String xml_problem = xstream.toXML(problem);
+
+            problemFOS.write("<?xml version=\"1.0\"?>\n".getBytes(StandardCharsets.UTF_8));
+            byte[] bytes = xml_problem.getBytes(StandardCharsets.UTF_8);
+            problemFOS.write(bytes);
+
+        }catch (Exception e){
+            System.err.println("Error in XML Write: " + e.getMessage());
+        }
+    }
+
+
+    /**
      * Returns the error manager of the parser.
      *
      * @return the error manager of the parser.
@@ -2213,16 +2296,20 @@ public final class Parser implements Callable<Integer> {
                     || !errorManager.getMessages(Message.Type.PARSER_ERROR).isEmpty()) {
                     return null;
                 }
-            } else if (LOGGER.isInfoEnabled()) {
-                StringBuilder strb = new StringBuilder();
-                strb.append("\nparsing domain file \"");
-                strb.append(this.getDomainFile().getName());
-                strb.append("\" done successfully");
-                strb.append("\nparsing problem file \"");
-                strb.append(this.getProblemFile().getName());
-                strb.append("\" done successfully");
-                strb.append("\n");
-                LOGGER.info(strb);
+            } else {
+                this.export(this.getDomain(), this.getProblem(), this.getDomainExportFile(), this.getProblemExportFile());
+
+                if (LOGGER.isInfoEnabled()) {
+                    StringBuilder strb = new StringBuilder();
+                    strb.append("\nparsing domain file \"");
+                    strb.append(this.getDomainFile().getName());
+                    strb.append("\" done successfully");
+                    strb.append("\nparsing problem file \"");
+                    strb.append(this.getProblemFile().getName());
+                    strb.append("\" done successfully");
+                    strb.append("\n");
+                    LOGGER.info(strb);
+                }
             }
         } catch (FileNotFoundException e) {
             LOGGER.fatal(e.getMessage());
