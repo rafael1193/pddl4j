@@ -19,6 +19,7 @@
 
 package fr.uga.pddl4j.parser;
 
+import com.thoughtworks.xstream.core.TreeMarshaller;
 import fr.uga.pddl4j.parser.lexer.Lexer;
 import fr.uga.pddl4j.parser.lexer.ParseException;
 
@@ -2216,30 +2217,34 @@ public final class Parser implements Callable<Integer> {
     /**
      * Export a planning domain and a planning problem to XML files.
      *
-     * @param domain  the file that contains the planning domains.
-     * @param problem the file that contains the planning problem.
-     * @param domainFile the file to export planning problem.
+     * @param domain      the file that contains the planning domains.
+     * @param problem     the file that contains the planning problem.
+     * @param domainFile  the file to export planning problem.
      * @param problemFile the file to export the planning problem.
      * @throws FileNotFoundException if the specified domain or problem file does not exist.
      */
-    public void export(ParsedDomain domain, ParsedProblem problem, File domainFile, File problemFile) throws FileNotFoundException {
+    public void export(ParsedDomain domain, ParsedProblem problem, File domainFile, File problemFile)
+        throws FileNotFoundException, TreeMarshaller.CircularReferenceException {
         XStream xstream = new XStream();
+        // Do not use Xpath references in the xml file. Beware cycles are not supported and
+        // if they are found a CircularReferenceException is raised (http://x-stream.github.io/graphs.html)
+        xstream.setMode(XStream.NO_REFERENCES);
 
-        try(FileOutputStream domainFOS = new FileOutputStream(domainFile)){
+        try (FileOutputStream domainFOS = new FileOutputStream(domainFile)) {
             domainFOS.write("<?xml version=\"1.0\"?>\n".getBytes(StandardCharsets.UTF_8));
             xstream.toXML(domain, domainFOS);
-        }catch (Exception e){
+        } catch (Exception e) {
             System.err.println("Error in XML Write: " + e.getMessage());
         }
 
-        try(FileOutputStream problemFOS = new FileOutputStream(problemFile)){
+        try (FileOutputStream problemFOS = new FileOutputStream(problemFile)) {
             String xml_problem = xstream.toXML(problem);
 
             problemFOS.write("<?xml version=\"1.0\"?>\n".getBytes(StandardCharsets.UTF_8));
             byte[] bytes = xml_problem.getBytes(StandardCharsets.UTF_8);
             problemFOS.write(bytes);
 
-        }catch (Exception e){
+        } catch (Exception e) {
             System.err.println("Error in XML Write: " + e.getMessage());
         }
     }
