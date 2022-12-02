@@ -67,8 +67,18 @@ public class NamedTypedList implements Serializable {
      * @param name the name of the list.
      */
     public NamedTypedList(final Symbol<String> name) {
+        this(name, new ArrayList<>());
+    }
+
+    /**
+     * Creates new named typed list with a specified name and list of argument.
+     *
+     * @param name the name of the list.
+     * @param arguments the list of argument of the list.
+     */
+    public NamedTypedList(final Symbol<String> name, final List<TypedSymbol<String>> arguments) {
         this.name = name;
-        this.arguments = new ArrayList<>();
+        this.arguments = arguments;
         this.types = new ArrayList<>();
     }
 
@@ -114,9 +124,6 @@ public class NamedTypedList implements Serializable {
      * @param type the type to add.
      */
     public void addType(final Symbol<String> type) {
-         /*if (!type.equals(Parser.OBJECT)) {
-            this.types.remove(Parser.OBJECT);
-        }*/
         if (!this.types.contains(type)) {
             this.types.add(type);
         }
@@ -163,18 +170,6 @@ public class NamedTypedList implements Serializable {
         return this.arguments.add(arg);
 
     }
-
-    /**
-     * Renames the variable contained in this typed list. For instance, if the nth argument is a
-     * variable it will be rename <code>?Xn</code>.
-     *
-     * @see Symbol<String>#renameVariables(int)
-     */
-    /*public final void renameVariables() {
-        for (int i = 0; i < this.arguments.size(); i++) {
-            arguments.get(i).renameVariables(i);
-        }
-    }*/
 
     /**
      * Returns a string representation of this named typed list.

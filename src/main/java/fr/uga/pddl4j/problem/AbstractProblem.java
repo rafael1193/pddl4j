@@ -16,29 +16,30 @@
 package fr.uga.pddl4j.problem;
 
 import fr.uga.pddl4j.parser.Connector;
+import fr.uga.pddl4j.parser.DefaultParsedProblem;
 import fr.uga.pddl4j.parser.Expression;
+import fr.uga.pddl4j.parser.NamedTypedList;
 import fr.uga.pddl4j.parser.ParsedAction;
 import fr.uga.pddl4j.parser.ParsedDerivedPredicate;
 import fr.uga.pddl4j.parser.ParsedMethod;
-import fr.uga.pddl4j.parser.NamedTypedList;
-import fr.uga.pddl4j.parser.ParsedProblemImpl;
+import fr.uga.pddl4j.parser.ParsedTaskNetwork;
 import fr.uga.pddl4j.parser.RequireKey;
 import fr.uga.pddl4j.parser.Symbol;
-import fr.uga.pddl4j.parser.ParsedTaskNetwork;
+import fr.uga.pddl4j.parser.SymbolType;
 import fr.uga.pddl4j.parser.TimeSpecifier;
 import fr.uga.pddl4j.parser.TypedSymbol;
-import fr.uga.pddl4j.parser.SymbolType;
 import fr.uga.pddl4j.parser.UnexpectedExpressionException;
 import fr.uga.pddl4j.problem.operator.AbstractInstantiatedOperator;
 import fr.uga.pddl4j.problem.operator.AbstractIntOperator;
+import fr.uga.pddl4j.problem.operator.DefaultOrderingConstraintNetwork;
 import fr.uga.pddl4j.problem.operator.IntAction;
 import fr.uga.pddl4j.problem.operator.IntMethod;
 import fr.uga.pddl4j.problem.operator.IntTaskNetwork;
-import fr.uga.pddl4j.problem.operator.DefaultOrderingConstraintNetwork;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -65,7 +66,7 @@ public abstract class AbstractProblem implements Problem {
     /**
      * The PDDL problem.
      */
-    private ParsedProblemImpl problem;
+    private DefaultParsedProblem problem;
 
     /**
      * The set of requirements of the problem.
@@ -256,9 +257,17 @@ public abstract class AbstractProblem implements Problem {
          */
         ACTIONS,
         /**
+         * The list of durative_actions of the instantiated problem.
+         */
+        DURATIVE_ACTIONS,
+        /**
          * The list of methods of the instantiated problem.
          */
         METHODS,
+        /**
+         * The list of durative methods of the instantiated problem.
+         */
+        DURATIVE_METHODS,
         /**
          * The list of relevant fluents of the instantiated problem.
          */
@@ -301,7 +310,7 @@ public abstract class AbstractProblem implements Problem {
      *
      * @param problem the problem.
      */
-    public AbstractProblem(final ParsedProblemImpl problem) {
+    public AbstractProblem(final DefaultParsedProblem problem) {
         this();
         this.problem = problem;
     }
@@ -311,7 +320,7 @@ public abstract class AbstractProblem implements Problem {
      *
      * @return the parsed problem used to create this problem.
      */
-    public final ParsedProblemImpl getParsedProblem() {
+    public final DefaultParsedProblem getParsedProblem() {
         return this.problem;
     }
 
@@ -606,7 +615,7 @@ public abstract class AbstractProblem implements Problem {
      * @param exp the expression.
      */
     private void initEitherTypes(final Expression<String> exp) {
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case AND:
             case OR:
                 exp.getChildren().forEach(this::initEitherTypes);
@@ -675,7 +684,7 @@ public abstract class AbstractProblem implements Problem {
                 // Do nothing
                 break;
             default:
-                throw new UnexpectedExpressionException(exp.getConnective().toString());
+                throw new UnexpectedExpressionException(exp.getConnector().toString());
         }
     }
 
@@ -699,9 +708,11 @@ public abstract class AbstractProblem implements Problem {
                         image.append("~");
                         image.append(type.getValue());
                     }
-                    argType.add(new Symbol<Integer>(SymbolType.TYPE, this.typeSymbols.indexOf(image.toString())));
+                    argType.add(new Symbol<Integer>(SymbolType.TYPE,
+                        this.typeSymbols.indexOf(image.toString())));
                 } else {
-                    argType.add(new Symbol<Integer>(SymbolType.TYPE, this.typeSymbols.indexOf(types.get(0).getValue())));
+                    argType.add(new Symbol<Integer>(SymbolType.TYPE,
+                        this.typeSymbols.indexOf(types.get(0).getValue())));
                 }
             }
             this.predicateSignatures.add(argType);
@@ -884,7 +895,7 @@ public abstract class AbstractProblem implements Problem {
         final Set<Expression<Integer>> init =  this.getParsedProblem().getInit().stream().map(this::initExpression)
             .collect(Collectors.toCollection(LinkedHashSet::new));
         for (Expression<Integer> exp : init) {
-            switch (exp.getConnective()) {
+            switch (exp.getConnector()) {
                 case FN_ATOM:
                     this.intInitFunctions.add(exp);
                     this.intInitFunctionCost.put(exp.getChildren().get(0), exp.getChildren().get(1).getValue());
@@ -901,7 +912,7 @@ public abstract class AbstractProblem implements Problem {
                     }
                     break;
                 default:
-                    throw new UnexpectedExpressionException(exp.getConnective().toString());
+                    throw new UnexpectedExpressionException(exp.getConnector().toString());
 
             }
         }
@@ -976,10 +987,12 @@ public abstract class AbstractProblem implements Problem {
         final IntMethod intMeth = new IntMethod(method.getName().getValue(), method.getArity());
         // Encode the parameters of the operator
         final List<String> variables = new ArrayList<>(method.getArity());
+        final List<Integer> types = new ArrayList<>(method.getArity());
         for (int i = 0; i < method.getArity(); i++) {
             final TypedSymbol<String> parameter = method.getParameters().get(i);
             final String typeImage = this.toStringType(parameter.getTypes());
             final int type = this.getTypes().indexOf(typeImage);
+            types.add(type);
             intMeth.setTypeOfParameter(i, type);
             variables.add(parameter.getValue());
         }
@@ -994,15 +1007,9 @@ public abstract class AbstractProblem implements Problem {
         // Encode the preconditions of the method
         final Expression<Integer> preconditions = this.initExpression(method.getPreconditions(), variables);
         intMeth.setPreconditions(preconditions);
-        // Encode the subtasks of the method
-        final Expression<Integer> subtasks = this.initExpression(method.getSubTasks(), variables);
-        intMeth.setSubTasks(subtasks);
-        // Encode the ordering constraints of the method
-        Expression<Integer> orderingConstraints = this.initOrderingConstraints(method);
-        intMeth.setOrderingConstraints(orderingConstraints);
-        // Encode the constraints of the method
-        Expression<Integer> constraints = this.initExpression(method.getConstraints(), variables);
-        intMeth.setConstraints(constraints);
+        // Encode the task network of the method
+        intMeth.setTaskNetwork(this.initTaskNetwork(method.getTaskNetwork(), variables, types));
+
         return intMeth;
     }
 
@@ -1016,80 +1023,60 @@ public abstract class AbstractProblem implements Problem {
             this.intInitialTaskNetwork = new IntTaskNetwork();
         } else {
             final int numberOfParameters = taskNetwork.getParameters().size();
-            this.intInitialTaskNetwork = new IntTaskNetwork(numberOfParameters);
-
-            final List<String> variables = new ArrayList<>(numberOfParameters);
+            final List<String> parameters = new ArrayList<>(numberOfParameters);
+            final List<Integer> types = new ArrayList<>(numberOfParameters);
             for (int i = 0; i < numberOfParameters; i++) {
                 final TypedSymbol<String> parameter = taskNetwork.getParameters().get(i);
                 final String typeImage = this.toStringType(parameter.getTypes());
                 final int type = this.getTypes().indexOf(typeImage);
-                this.intInitialTaskNetwork.setTypeOfParameter(i, type);
-                variables.add(parameter.getValue());
+                types.add(type);
+                parameters.add(taskNetwork.getParameters().get(i).getValue());
             }
-            // Encode the tasks of the task network
-            this.intInitialTaskNetwork.setTasks(this.initExpression(taskNetwork.getTasks(), variables));
-            // Encode the ordering constraints of the task network
-            Expression<Integer> orderingConstraints = null;
-            Expression<Integer> subtasks = this.intInitialTaskNetwork.getTasks();
-            if (taskNetwork.isTotallyOrdered() && subtasks.getChildren().size() > 1) {
-                orderingConstraints = new Expression<>(Connector.AND);
-                for (int i = 0; i < subtasks.getChildren().size() - 1; i++) {
-                    final Expression<Integer> constraint = new Expression<>(Connector.LESS_ORDERING_CONSTRAINT);
-                    final Expression<Integer> t1 = new Expression<>(Connector.TASK);
-                    t1.setTaskID(new Symbol<>(SymbolType.TASK_ID, i));
-                    constraint.addChild(t1);
-                    final Expression<Integer> t2 = new Expression<>(Connector.TASK);
-                    t2.setTaskID(new Symbol<>(SymbolType.TASK_ID, i + 1));
-                    constraint.addChild(t2);
-                    orderingConstraints.addChild(constraint);
-                }
-            } else {
-                final int size = subtasks.getChildren().size();
-                final DefaultOrderingConstraintNetwork constraints = new DefaultOrderingConstraintNetwork(size);
-                orderingConstraints = this.initExpression(taskNetwork.getOrdering());
-                for (Expression<Integer> c : orderingConstraints.getChildren()) {
-                    constraints.set(c.getChildren().get(0).getTaskID().getValue(),
-                        c.getChildren().get(1).getTaskID().getValue());
-                }
-                if (constraints.isTotallyOrdered() && subtasks.getChildren().size() > 1) {
-                    Expression<Integer> orderedSubtasks = new Expression<>(Connector.AND);
-                    for (int i = 0; i < size; i++) {
-                        int subtaskIndex = constraints.getTasksWithNoPredecessors().get(0);
-                        constraints.removeTask(subtaskIndex);
-                        Expression<Integer> st = subtasks.getChildren().get(subtaskIndex);
-                        subtasks.getChildren().remove(subtaskIndex);
-                        st.setTaskID(new Symbol<>(SymbolType.TASK_ID, i));
-                        orderedSubtasks.addChild(st);
-                    }
-                    this.intInitialTaskNetwork.setTasks(orderedSubtasks);
-                    orderingConstraints = new Expression<>(Connector.AND);
-                    for (int i = 0; i < orderedSubtasks.getChildren().size() - 1; i++) {
-                        final Expression<Integer> constraint = new Expression<>(Connector.LESS_ORDERING_CONSTRAINT);
-                        final Expression<Integer> t1 = new Expression<>(Connector.TASK);
-                        t1.setTaskID(new Symbol<>(SymbolType.TASK_ID, i));
-                        constraint.addChild(t1);
-                        final Expression<Integer> t2 = new Expression<>(Connector.TASK);
-                        t2.setTaskID(new Symbol<>(SymbolType.TASK_ID, i + 1));
-                        constraint.addChild(t2);
-                        orderingConstraints.addChild(constraint);
-                    }
-                }
-            }
-            this.intInitialTaskNetwork.setOrderingConstraints(orderingConstraints);
+            this.intInitialTaskNetwork = this.initTaskNetwork(taskNetwork, parameters, types);
         }
+    }
+
+    /**
+     * Encodes a specified task network into its integer representation.
+     *
+     * @param parsedTaskNetwork the parsed task network.
+     * @param parameters the parameters of the task network.
+     * @param types the type of parameters.
+     */
+    protected IntTaskNetwork initTaskNetwork(final ParsedTaskNetwork parsedTaskNetwork, final List<String> parameters,
+                                             final List<Integer> types) {
+        final int numberOfParameters = parsedTaskNetwork.getParameters().size();
+        final IntTaskNetwork intTaskNetwork = new IntTaskNetwork(numberOfParameters);
+        for (int i = 0; i < numberOfParameters; i++) {
+            intTaskNetwork.setTypeOfParameter(i, types.get(i));
+        }
+        intTaskNetwork.setTotallyOrdered(parsedTaskNetwork.isTotallyOrdered());
+        intTaskNetwork.setDurative(parsedTaskNetwork.isDurative());
+        // Encode the tasks of the task network
+        intTaskNetwork.setTasks(this.initExpression(parsedTaskNetwork.getTasks(), parameters));
+        // Encode the ordering constraints of the task network
+        intTaskNetwork.setOrderingConstraints(this.initOrderingConstraints(parsedTaskNetwork.getTasks(),
+            parsedTaskNetwork.getOrdering(), parsedTaskNetwork.isTotallyOrdered(), parsedTaskNetwork.isDurative()));
+        // Encode the constraints of the task network
+        intTaskNetwork.setConstraints(this.initExpression(parsedTaskNetwork.getConstraints(), parameters));
+        return intTaskNetwork;
     }
 
     /**
      * Encode the ordering constraints of method.
      *
-     * @param method the method.
+     * @param tasks the expression that represents the tasks.
+     * @param constraints the ordering constraints to encode.
+     * @param totallyOrdered the flag to indicate if the tasks are marked as totally ordered.
+     * @param totallyOrdered the flag to indicate if the constraints are marked as durative.
      */
-    private Expression<Integer> initOrderingConstraints(ParsedMethod method) {
+    private Expression<Integer> initOrderingConstraints(Expression<String> tasks,
+            Expression<String> constraints, boolean totallyOrdered, boolean durative) {
         Expression<Integer> orderingConstraints = null;
-        if (method.isTotallyOrdered() && method.getSubTasks().getChildren().size() > 1) {
+        if (totallyOrdered && tasks.getChildren().size() > 1) {
             orderingConstraints = new Expression<>(Connector.AND);
-            for (int i = 0; i < method.getSubTasks().getChildren().size() - 1; i++) {
-                if (!method.isDurative()) {
+            for (int i = 0; i < tasks.getChildren().size() - 1; i++) {
+                if (!durative) {
                     final Expression<Integer> constraint = new Expression<>(Connector.LESS_ORDERING_CONSTRAINT);
                     final Expression<Integer> t1 = new Expression<>(Connector.TASK_ID);
                     t1.setTaskID(new Symbol<>(SymbolType.TASK_ID, i));
@@ -1126,9 +1113,9 @@ public abstract class AbstractProblem implements Problem {
                 }
             }
         } else {
-            final int size = method.getSubTasks().getChildren().size();
-            final DefaultOrderingConstraintNetwork constraints = new DefaultOrderingConstraintNetwork(size);
-            orderingConstraints = this.initExpression(method.getOrdering());
+            orderingConstraints = this.initExpression(constraints);
+            // we could check is the ordering constraint are totally ordered even if they are declared as not and encode
+            // the orderering constraints as tottaly ordered if it is the case.
 
             // Code for reordering subtask if totally ordered
             /*for (Expression<Integer> c : orderingConstraints.getChildren()) {
@@ -1190,8 +1177,8 @@ public abstract class AbstractProblem implements Problem {
      */
     protected Expression<Integer> initExpression(final Expression<String> exp,
                                            final List<String> variables) {
-        final Expression<Integer> intExp = new Expression<>(exp.getConnective());
-        switch (exp.getConnective()) {
+        final Expression<Integer> intExp = new Expression<>(exp.getConnector());
+        switch (exp.getConnector()) {
             case EQUAL_ATOM:
                 List<Symbol<Integer>> args = new ArrayList<>(exp.getArguments().size());
                 for (int i = 0; i < exp.getArguments().size(); i++) {
@@ -1199,7 +1186,8 @@ public abstract class AbstractProblem implements Problem {
                     if (argument.getType().equals(SymbolType.VARIABLE)) {
                         args.add(new Symbol<>(SymbolType.VARIABLE, -variables.indexOf(argument.getValue()) - 1));
                     } else {
-                        args.add(new Symbol<>(SymbolType.CONSTANT, this.getConstantSymbols().indexOf(argument.getValue())));
+                        args.add(new Symbol<>(SymbolType.CONSTANT,
+                            this.getConstantSymbols().indexOf(argument.getValue())));
                     }
                 }
                 intExp.setArguments(args);
@@ -1213,7 +1201,8 @@ public abstract class AbstractProblem implements Problem {
                     if (argument.getType().equals(SymbolType.VARIABLE)) {
                         args.add(new Symbol<>(SymbolType.VARIABLE, -variables.indexOf(argument.getValue()) - 1));
                     } else {
-                        args.add(new Symbol<>(SymbolType.CONSTANT, this.getConstantSymbols().indexOf(argument.getValue())));
+                        args.add(new Symbol<>(SymbolType.CONSTANT,
+                            this.getConstantSymbols().indexOf(argument.getValue())));
                     }
                 }
                 intExp.setArguments(args);
@@ -1227,7 +1216,8 @@ public abstract class AbstractProblem implements Problem {
                     if (argument.getType().equals(SymbolType.VARIABLE)) {
                         args.add(new Symbol<>(SymbolType.VARIABLE, -variables.indexOf(argument.getValue()) - 1));
                     } else {
-                        args.add(new Symbol<>(SymbolType.CONSTANT, this.getConstantSymbols().indexOf(argument.getValue())));
+                        args.add(new Symbol<>(SymbolType.CONSTANT,
+                            this.getConstantSymbols().indexOf(argument.getValue())));
                     }
                 }
                 intExp.setArguments(args);
@@ -1244,7 +1234,8 @@ public abstract class AbstractProblem implements Problem {
                 final List<TypedSymbol<String>> qvar = exp.getQuantifiedVariables();
                 final String type = this.toStringType(qvar.get(0).getTypes());
                 int typeIndex = this.getTypes().indexOf(type);
-                final TypedSymbol<Integer> intQvar  = new TypedSymbol<Integer>(SymbolType.VARIABLE, -variables.size() - 1);
+                final TypedSymbol<Integer> intQvar  = new TypedSymbol<Integer>(SymbolType.VARIABLE,
+                    -variables.size() - 1);
                 intQvar.addType(new Symbol<>(SymbolType.TYPE, typeIndex));
                 intExp.addQuantifiedVariable(intQvar);
                 newVariables.add(qvar.get(0).getValue());
@@ -1316,7 +1307,8 @@ public abstract class AbstractProblem implements Problem {
                     if (argument.getType().equals(SymbolType.VARIABLE)) {
                         args.add(new Symbol<>(SymbolType.VARIABLE, -variables.indexOf(argument.getValue()) - 1));
                     } else {
-                        args.add(new Symbol<>(SymbolType.CONSTANT, this.getConstantSymbols().indexOf(argument.getValue())));
+                        args.add(new Symbol<>(SymbolType.CONSTANT,
+                            this.getConstantSymbols().indexOf(argument.getValue())));
                     }
                 }
                 if (exp.getTaskID() != null) { // TaskID is null the task carried out by a method is encoded
@@ -1332,18 +1324,18 @@ public abstract class AbstractProblem implements Problem {
             case EQUAL_ORDERING_CONSTRAINT:
                 Expression<Integer> t1 = new Expression<>();
                 if (exp.getChildren().get(0).getTimeSpecifier() != null) {
-                    t1.setConnective(Connector.TIMED_TASK_ID);
+                    t1.setConnector(Connector.TIMED_TASK_ID);
                 } else {
-                    t1.setConnective(Connector.TASK_ID);
+                    t1.setConnector(Connector.TASK_ID);
                 }
                 t1.setTaskID(new Symbol<>(SymbolType.TASK_ID,
                     Integer.valueOf(exp.getChildren().get(0).getTaskID().getValue().substring(1))));
                 intExp.addChild(t1);
                 Expression<Integer> t2 = new Expression<>();
                 if (exp.getChildren().get(0).getTimeSpecifier() != null) {
-                    t2.setConnective(Connector.TIMED_TASK_ID);
+                    t2.setConnector(Connector.TIMED_TASK_ID);
                 } else {
-                    t2.setConnective(Connector.TASK_ID);
+                    t2.setConnector(Connector.TASK_ID);
                 }
                 t2.setTaskID(new Symbol<>(SymbolType.TASK_ID,
                     Integer.valueOf(exp.getChildren().get(1).getTaskID().getValue().substring(1))));
@@ -1545,7 +1537,7 @@ public abstract class AbstractProblem implements Problem {
      */
     protected String toString(final Expression<Integer> exp, String baseOffset, final String separator) {
         final StringBuilder str = new StringBuilder();
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case ATOM:
                 str.append("(");
                 str.append(this.getPredicateSymbols().get(exp.getSymbol().getValue()));
@@ -1608,7 +1600,7 @@ public abstract class AbstractProblem implements Problem {
             case OR:
                 String offsetOr = baseOffset + "  ";
                 str.append("(");
-                str.append(exp.getConnective().getImage());
+                str.append(exp.getConnector().getImage());
                 str.append(" ");
                 if (!exp.getChildren().isEmpty()) {
                     for (int i = 0; i < exp.getChildren().size() - 1; i++) {
@@ -1621,7 +1613,7 @@ public abstract class AbstractProblem implements Problem {
                 break;
             case FORALL:
             case EXISTS:
-                str.append(" (").append(exp.getConnective().getImage());
+                str.append(" (").append(exp.getConnector().getImage());
                 str.append(" (");
                 for (TypedSymbol<Integer> var: exp.getQuantifiedVariables()) {
                     str.append(Symbol.DEFAULT_VARIABLE_SYMBOL);
@@ -1646,10 +1638,10 @@ public abstract class AbstractProblem implements Problem {
             case F_EXP_T:
             case TRUE:
             case FALSE:
-                str.append(exp.getConnective());
+                str.append(exp.getConnector());
                 break;
             case TIME_VAR:
-                str.append(exp.getConnective().getImage());
+                str.append(exp.getConnector().getImage());
                 break;
             case FN_ATOM:
             case WHEN:
@@ -1671,7 +1663,7 @@ public abstract class AbstractProblem implements Problem {
             case SOMETIME_AFTER_CONSTRAINT:
             case SOMETIME_BEFORE_CONSTRAINT:
                 str.append("(");
-                str.append(exp.getConnective().getImage());
+                str.append(exp.getConnector().getImage());
                 str.append(" ");
                 str.append(toString(exp.getChildren().get(0), baseOffset));
                 str.append(" ");
@@ -1687,14 +1679,14 @@ public abstract class AbstractProblem implements Problem {
             case NOT:
             case ALWAYS_CONSTRAINT:
                 str.append("(");
-                str.append(exp.getConnective().getImage());
+                str.append(exp.getConnector().getImage());
                 str.append(" ");
                 str.append(toString(exp.getChildren().get(0), baseOffset));
                 str.append(")");
                 break;
             case IS_VIOLATED:
                 str.append("(");
-                str.append(exp.getConnective().getImage());
+                str.append(exp.getConnector().getImage());
                 str.append(")");
                 break;
             case LESS_ORDERING_CONSTRAINT:
@@ -1706,14 +1698,14 @@ public abstract class AbstractProblem implements Problem {
                 str.append(Symbol.DEFAULT_TASK_ID_SYMBOL);
                 str.append(exp.getChildren().get(0).getTaskID());
                 str.append(" ");
-                str.append(exp.getConnective().getImage());
+                str.append(exp.getConnector().getImage());
                 str.append(" ");
                 str.append(Symbol.DEFAULT_TASK_ID_SYMBOL);
                 str.append(exp.getChildren().get(1).getTaskID());
                 str.append(")");
                 break;
             default:
-                throw new UnexpectedExpressionException(exp.getConnective().toString());
+                throw new UnexpectedExpressionException(exp.getConnector().toString());
         }
         return str.toString();
     }

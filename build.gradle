@@ -3,10 +3,9 @@ buildscript {
         gradlePluginPortal()
     }
     configurations.all {
-        resolutionStrategy.force 'net.java.dev.javacc:javacc:6.1.2'
+        resolutionStrategy.force 'net.java.dev.javacc:javacc:6.2'
     }
 }
-
 
 plugins {
     id "ca.coglinc.javacc" version "2.4.0"
@@ -29,13 +28,13 @@ repositories {
 
 dependencies {
     implementation group: 'com.googlecode.json-simple', name: 'json-simple', version: '1.1.1'
-    implementation group: 'org.apache.logging.log4j', name: 'log4j', version: '2.14.1'
-    implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.14.1'
+    implementation group: 'org.apache.logging.log4j', name: 'log4j', version: '2.17.2'
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.17.2'
     implementation group: 'org.openjdk.jol', name: 'jol-core', version: '0.9'
     implementation group: 'com.thoughtworks.xstream', name: 'xstream', version: '1.4.19'
     testImplementation group: 'junit', name: 'junit', version: '4.13'
-    implementation 'info.picocli:picocli:4.6.1'
-    annotationProcessor 'info.picocli:picocli-codegen:4.6.1'
+    implementation 'info.picocli:picocli:4.6.2'
+    annotationProcessor 'info.picocli:picocli-codegen:4.6.2'
 }
 
 
@@ -58,7 +57,7 @@ jjdoc {
 compileJava {
     options.compilerArgs += '-proc:none'
     options.compilerArgs += ["-Aproject=${project.group}/${project.name}"]
-//    options.compilerArgs += '-Xlint:none'
+    options.compilerArgs += '-Xlint:unchecked'
 }
 
 compileTestJava {
@@ -153,11 +152,11 @@ test {
             //'**/ADLProblemInstantiationTest.class',
             //'**/HTNProblemInstantiationTest.class',
             //'**/TemporalProblemInstantiationTest.class',
-            '**/HSPTest.class',
+            //'**/HSPTest.class',
             //'**/FFTest.class',
             //'**/GSPTest.class',
             //'**/TFDTest.class',
-            //'**/PFDTest.class'
+            '**/PFDTest.class'
     ]
 
 }

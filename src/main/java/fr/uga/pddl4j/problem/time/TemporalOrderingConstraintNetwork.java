@@ -21,6 +21,7 @@ package fr.uga.pddl4j.problem.time;
 
 import fr.uga.pddl4j.parser.Symbol;
 import fr.uga.pddl4j.problem.operator.AbstractOrderingConstraintNetwork;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,7 +32,7 @@ import java.util.List;
  * @version 1.0 - 09.06.2022
  * @since 4.0
  */
-public class SimpleTemporalNetwork extends AbstractOrderingConstraintNetwork {
+public class TemporalOrderingConstraintNetwork extends AbstractOrderingConstraintNetwork {
 
     /**
      * The matrix used to the store the temporal network.
@@ -44,7 +45,7 @@ public class SimpleTemporalNetwork extends AbstractOrderingConstraintNetwork {
      *
      * @param other the other simple temporal network to use to make the copy.
      */
-    public SimpleTemporalNetwork(final SimpleTemporalNetwork other) {
+    public TemporalOrderingConstraintNetwork(final TemporalOrderingConstraintNetwork other) {
         final int size = other.network.size();
         this.network = new ArrayList<>();
         for (int i = 0; i < size; i++) {
@@ -59,7 +60,7 @@ public class SimpleTemporalNetwork extends AbstractOrderingConstraintNetwork {
     /**
      * Creates a new empty simple temporal network.
      */
-    public SimpleTemporalNetwork() {
+    public TemporalOrderingConstraintNetwork() {
         this(0);
     }
 
@@ -70,7 +71,7 @@ public class SimpleTemporalNetwork extends AbstractOrderingConstraintNetwork {
      * @see TemporalRelation
      * @param size the number of tasks of the simple temporal network.
      */
-    public SimpleTemporalNetwork(int size) {
+    public TemporalOrderingConstraintNetwork(int size) {
         int numberOfTimePoints = size * 2;
         this.network = new ArrayList<>(numberOfTimePoints);
         for (int i = 0; i < numberOfTimePoints; i++) {
@@ -81,7 +82,6 @@ public class SimpleTemporalNetwork extends AbstractOrderingConstraintNetwork {
             this.network.add(list);
         }
     }
-
 
     /**
      * Returns the temporal relation between two specified task.
@@ -165,7 +165,7 @@ public class SimpleTemporalNetwork extends AbstractOrderingConstraintNetwork {
      */
     @Override
     public int size() {
-        return this.network.size()/2;
+        return this.network.size() / 2;
     }
 
     /**
@@ -179,12 +179,6 @@ public class SimpleTemporalNetwork extends AbstractOrderingConstraintNetwork {
     }
 
 
-
-    //public void removeRow(int task) {
-    //}
-
-    public void removeColumn(int task) {
-    }
 
     /**
      * TO DO: NOT IMPLEMENTED
@@ -229,8 +223,8 @@ public class SimpleTemporalNetwork extends AbstractOrderingConstraintNetwork {
             for (int j = 0; j < this.network.size(); j++) {
                 str.append("(");
                 str.append(Symbol.DEFAULT_TASK_ID_SYMBOL);
-                str.append(i/2);
-                if (i%2 == 0) {
+                str.append(i / 2);
+                if (i % 2 == 0) {
                     str.append("_start ");
                 } else {
                     str.append("_end ");
@@ -238,8 +232,8 @@ public class SimpleTemporalNetwork extends AbstractOrderingConstraintNetwork {
                 str.append(this.get(i, j));
                 str.append(" ");
                 str.append(Symbol.DEFAULT_TASK_ID_SYMBOL);
-                str.append(j/2);
-                if (j%2 == 0) {
+                str.append(j / 2);
+                if (j % 2 == 0) {
                     str.append("_start)\n");
                 } else {
                     str.append("_end)\n");
@@ -252,10 +246,10 @@ public class SimpleTemporalNetwork extends AbstractOrderingConstraintNetwork {
     /**
      * TO REMOVED.
      *
-     * @param args
+     * @param args no arguments.
      */
     public static void main(String[] args) {
-        SimpleTemporalNetwork network = new SimpleTemporalNetwork(6);
+        TemporalOrderingConstraintNetwork network = new TemporalOrderingConstraintNetwork(6);
         // T0_start < T0_end
         network.set(0, 1, TemporalRelation.LESS);
         // T1_start < T1_end

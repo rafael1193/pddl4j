@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * This class implements a compact representation for durative actions for the planning process.
+ * This class implements a compact representation for a durative action.
  *
  * @author D. Pellier
  * @version 1.0 - 03.06.2022
@@ -43,17 +43,12 @@ public class DurativeAction extends AbstractDurativeOperator {
     private List<TemporalConditionalEffect> effects;
 
     /**
-     * The duration of the action.
+     * The default duration of the method.
      */
-    private NumericVariable duration;
+    public static NumericVariable DEFAULT_DURATION = new NumericVariable(NumericVariable.DURATION, 0.0);
 
     /**
-     * The duration of the action.
-     */
-    private List<NumericConstraint> durationConstraints;
-
-    /**
-     * Creates a new action from an other. This constructor is the copy constructor.
+     * Creates a new action from another durative action. This constructor is the copy constructor.
      *
      * @param other the other action.
      */
@@ -62,13 +57,7 @@ public class DurativeAction extends AbstractDurativeOperator {
         this.effects = new ArrayList<>();
         this.effects.addAll(other.getConditionalEffects().stream().map(TemporalConditionalEffect::new)
             .collect(Collectors.toList()));
-        if (this.getDurationConstraints() != null) {
-            this.durationConstraints.addAll(other.getDurationConstraints().stream().map(NumericConstraint::new)
-                .collect(Collectors.toList()));
-        }
-        if (this.duration != null) {
-            this.duration = new NumericVariable(other.duration);
-        }
+
     }
 
     /**
@@ -80,9 +69,6 @@ public class DurativeAction extends AbstractDurativeOperator {
     public DurativeAction(final String name, final int arity) {
         super(name, arity);
         this.effects = new ArrayList<>();
-        this.duration = new NumericVariable(-2);
-        this.duration.setValue(0.0);
-        this.durationConstraints = null;
     }
 
     /**
@@ -93,13 +79,11 @@ public class DurativeAction extends AbstractDurativeOperator {
      * @param precondition the precondition of the action.
      * @param effect       the effects of the action.
      */
-    public DurativeAction(final String name, final int arity, final TemporalCondition precondition, final TemporalEffect effect) {
+    public DurativeAction(final String name, final int arity, final TemporalCondition precondition,
+            final TemporalEffect effect) {
         this(name, arity);
         this.setPrecondition(precondition);
         this.addConditionalEffect(new TemporalConditionalEffect(effect));
-        this.duration = new NumericVariable(-2);
-        this.duration.setValue(0.0);
-        this.durationConstraints = null;
     }
 
     /**
@@ -149,42 +133,6 @@ public class DurativeAction extends AbstractDurativeOperator {
             uce.getOverallEffect().getNumericAssignments().addAll(te.getOverallEffect().getNumericAssignments());
         });
         return uce;
-    }
-
-    /**
-     * Returns the duration of the action.
-     *
-     * @return the duration of the action.
-     */
-    public final List<NumericConstraint> getDurationConstraints() {
-        return this.durationConstraints;
-    }
-
-    /**
-     * Sets the duration of the action.
-     *
-     * @param constraints the duration to set.
-     */
-    public final void setDurationConstraints(final List<NumericConstraint> constraints) {
-        this.durationConstraints = constraints;
-    }
-
-    /**
-     * Returns the duration of the action.
-     *
-     * @return the duration of the action.
-     */
-    public final NumericVariable getDuration() {
-        return this.duration;
-    }
-
-    /**
-     * Sets the duration of the action.
-     *
-     * @param duration the duration to set.
-     */
-    public final void setDuration(final NumericVariable duration) {
-        this.duration = duration;
     }
 
 }

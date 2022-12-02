@@ -54,6 +54,7 @@ public class Symbol<T> implements Serializable {
      *
      * @param type  the type of the symbol.
      * @param value the token.
+     * @param location the location of the symbol.
      */
     public Symbol(final SymbolType type, final T value, final Location location) {
         super();
@@ -202,6 +203,7 @@ public class Symbol<T> implements Serializable {
      * @see java.lang.Object#equals(java.lang.Object)
      */
     @Override
+    @SuppressWarnings("unchecked")
     public boolean equals(final Object object) {
         if (object != null && object instanceof Symbol) {
             Symbol<T> other = (Symbol<T>) object;

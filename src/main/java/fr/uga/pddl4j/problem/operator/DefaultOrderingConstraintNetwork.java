@@ -196,7 +196,7 @@ public class DefaultOrderingConstraintNetwork extends AbstractOrderingConstraint
      * @param task the task.
      * @return a bit vector of the tasks ordered after a specified task.
      */
-    public BitVector getTaskOrderedAfter(int task) {
+    public BitVector  getTaskOrderedAfter(int task) {
         return matrix.getRow(task);
     }
 
@@ -242,6 +242,8 @@ public class DefaultOrderingConstraintNetwork extends AbstractOrderingConstraint
     public boolean equals(Object object) {
         if (object != null && object instanceof DefaultOrderingConstraintNetwork) {
             DefaultOrderingConstraintNetwork other = (DefaultOrderingConstraintNetwork) object;
+            this.matrix.transitiveClosure();
+            other.matrix.transitiveClosure();
             return Objects.equals(this.matrix, other.matrix);
         }
         return false;
@@ -249,7 +251,8 @@ public class DefaultOrderingConstraintNetwork extends AbstractOrderingConstraint
 
     @Override
     public int hashCode() {
-        return Objects.hash(matrix);
+        this.matrix.transitiveClosure();
+        return Objects.hash(this.matrix);
     }
 
     /**
@@ -278,6 +281,7 @@ public class DefaultOrderingConstraintNetwork extends AbstractOrderingConstraint
                     index++;
                 }
             }
+            str.setLength(str.length() - 1);
         }
         return str.toString();
     }

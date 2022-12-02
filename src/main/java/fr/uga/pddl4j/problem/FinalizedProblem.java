@@ -16,8 +16,8 @@
 package fr.uga.pddl4j.problem;
 
 import fr.uga.pddl4j.parser.Connector;
+import fr.uga.pddl4j.parser.DefaultParsedProblem;
 import fr.uga.pddl4j.parser.Expression;
-import fr.uga.pddl4j.parser.ParsedProblemImpl;
 import fr.uga.pddl4j.parser.Symbol;
 import fr.uga.pddl4j.parser.SymbolType;
 import fr.uga.pddl4j.parser.UnexpectedExpressionException;
@@ -36,6 +36,7 @@ import fr.uga.pddl4j.problem.operator.Action;
 import fr.uga.pddl4j.problem.operator.Condition;
 import fr.uga.pddl4j.problem.operator.ConditionalEffect;
 import fr.uga.pddl4j.problem.operator.Constants;
+import fr.uga.pddl4j.problem.operator.DefaultOrderingConstraintNetwork;
 import fr.uga.pddl4j.problem.operator.DurativeAction;
 import fr.uga.pddl4j.problem.operator.DurativeMethod;
 import fr.uga.pddl4j.problem.operator.Effect;
@@ -44,14 +45,12 @@ import fr.uga.pddl4j.problem.operator.IntMethod;
 import fr.uga.pddl4j.problem.operator.IntTaskNetwork;
 import fr.uga.pddl4j.problem.operator.Method;
 import fr.uga.pddl4j.problem.operator.Operator;
-import fr.uga.pddl4j.problem.operator.DefaultOrderingConstraintNetwork;
 import fr.uga.pddl4j.problem.operator.TaskNetwork;
-import fr.uga.pddl4j.problem.time.SimpleTemporalNetwork;
+import fr.uga.pddl4j.problem.time.TemporalOrderingConstraintNetwork;
 import fr.uga.pddl4j.problem.time.TemporalCondition;
 import fr.uga.pddl4j.problem.time.TemporalConditionalEffect;
 import fr.uga.pddl4j.problem.time.TemporalEffect;
 import fr.uga.pddl4j.problem.time.TemporalRelation;
-import fr.uga.pddl4j.problem.time.TemporalTaskNetwork;
 import fr.uga.pddl4j.util.BitSet;
 import fr.uga.pddl4j.util.BitVector;
 
@@ -66,7 +65,7 @@ import java.util.Set;
 
 /**
  * This class contains all the methods needed to post instantiation process of a planning problem. In particular, this
- * class contains the methods necessary to compactly encode the problem in susing compact bit set representation.
+ * class contains the methods necessary to compactly encode the problem using compact bit set representation.
  *
  * @author D. Pellier
  * @version 4.0 - 04.12.2020
@@ -104,7 +103,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
     private Goal goal;
 
     /**
-     * The table of the relevant fluents in the form of <code>Expression<Integer></code>.
+     * The table of the relevant fluents in the form of {@code Expression}.
      */
     private List<Expression<Integer>> intExpFluents;
 
@@ -114,7 +113,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
     private Map<Expression<Integer>, Integer> mapOfFluentIndex;
 
     /**
-     * The table of the relevant numeric fluent in the form of <code>Expression</code>.
+     * The table of the relevant numeric fluent in the form of {@code Expression}.
      */
     private List<Expression<Integer>> intExpNumericFluents;
 
@@ -158,7 +157,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      *
      * @param problem the problem.
      */
-    public FinalizedProblem(final ParsedProblemImpl problem) {
+    public FinalizedProblem(final DefaultParsedProblem problem) {
         super(problem);
     }
 
@@ -358,7 +357,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      * @param facts the set of relevant facts.
      */
     protected void extractRelevantFluents(final Expression<Integer> exp, final Set<Expression<Integer>> facts) {
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case ATOM:
                 Inertia inertia = this.getGroundInertia().get(exp);
                 if (inertia == null) {
@@ -476,7 +475,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      * @param fluents the set of relevant facts.
      */
     private void extractRelevantNumericFluents(final Expression<Integer> exp, final Set<Expression<Integer>> fluents) {
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case FN_HEAD:
                 fluents.add(exp);
                 break;
@@ -509,6 +508,9 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 this.extractRelevantNumericFluents(exp.getChildren().get(1), fluents);
                 break;
             case F_EXP:
+            case AT_START:
+            case AT_END:
+            case OVER_ALL:
                 this.extractRelevantNumericFluents(exp.getChildren().get(0), fluents);
                 break;
             case TIME_VAR:
@@ -519,7 +521,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 // do nothing
                 break;
             default:
-                throw new UnexpectedExpressionException(exp.getConnective().toString());
+                throw new UnexpectedExpressionException(exp.getConnector().toString());
 
         }
     }
@@ -559,13 +561,17 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
         int actionIndex = 0;
         for (IntAction intAction : this.getIntActions()) {
             List<IntAction> normalized = this.normalizeAction(intAction);
-            for (int i = 0 ; i < normalized.size(); i++) {
-                IntAction na = normalized.get(i);
+            for (int i = 0; i < normalized.size(); i++) {
+                final IntAction na = normalized.get(i);
                 if (!na.isDurative()) {
-                    if (i != 0) this.getTaskResolvers().get(actionIndex).add(actions.size());
+                    if (i != 0) {
+                        this.getTaskResolvers().get(actionIndex).add(actions.size());
+                    }
                     this.actions.add(this.finalizeAction(na));
                 } else {
-                    if (i != 0) this.getTaskResolvers().get(actionIndex).add(-this.durativeActions.size() - 1);
+                    if (i != 0) {
+                        this.getTaskResolvers().get(actionIndex).add(-this.durativeActions.size() - 1);
+                    }
                     this.durativeActions.add(this.finalizeDurativeAction(na));
                 }
             }
@@ -582,7 +588,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      */
     private Effect finalizeEffect(final Expression<Integer> exp) throws UnexpectedExpressionException {
         final Effect effect = new Effect();
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case ATOM:
                 Integer index = this.mapOfFluentIndex.get(exp);
                 if (index != null) {
@@ -598,7 +604,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
             case AND:
                 final List<Expression<Integer>> children = exp.getChildren();
                 for (Expression<Integer> ei : children) {
-                    switch (ei.getConnective()) {
+                    switch (ei.getConnector()) {
                         case ATOM:
                             index = this.mapOfFluentIndex.get(ei);
                             if (index != null) {
@@ -623,7 +629,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                             effect.addNumericAssignment(assignment);
                             break;
                         default:
-                            throw new UnexpectedExpressionException(ei.getConnective().toString());
+                            throw new UnexpectedExpressionException(ei.getConnector().toString());
                     }
                 }
                 break;
@@ -639,7 +645,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 // Do nothing
                 break;
             default:
-                throw new UnexpectedExpressionException(exp.getConnective().toString());
+                throw new UnexpectedExpressionException(exp.getConnector().toString());
         }
         return effect;
     }
@@ -653,20 +659,20 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      */
     private TemporalEffect finalizeTimeEffect(final Expression<Integer> exp) throws UnexpectedExpressionException {
         final TemporalEffect temporalEffect = new TemporalEffect();
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case AT_START:
             case AT_END:
             case OVER_ALL:
                 Effect effect =  null;
-                if (exp.getConnective().equals(Connector.AT_START)) {
+                if (exp.getConnector().equals(Connector.AT_START)) {
                     effect = temporalEffect.getAtStartEffect();
-                } else if (exp.getConnective().equals(Connector.AT_END)) {
+                } else if (exp.getConnector().equals(Connector.AT_END)) {
                     effect = temporalEffect.getAtEndEffect();
                 } else {
                     effect = temporalEffect.getOverallEffect();
                 }
                 Expression<Integer> sub = exp.getChildren().get(0);
-                switch (sub.getConnective()) {
+                switch (sub.getConnector()) {
                     case ATOM:
                         effect.getPositiveFluents().set(this.getMapOfFluentIndex().get(sub));
                         break;
@@ -682,28 +688,37 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                         effect.addNumericAssignment(assignment);
                         break;
                     default:
-                        throw new UnexpectedExpressionException(sub.getConnective().toString());
+                        throw new UnexpectedExpressionException(sub.getConnector().toString());
                 }
                 break;
             case AND:
                 for (Expression<Integer> e : exp.getChildren()) {
                     TemporalEffect te = this.finalizeTimeEffect(e);
-                    temporalEffect.getAtStartEffect().getPositiveFluents().or(te.getAtStartEffect().getPositiveFluents());
-                    temporalEffect.getAtStartEffect().getNegativeFluents().or(te.getAtStartEffect().getNegativeFluents());
-                    temporalEffect.getAtStartEffect().getNumericAssignments().addAll(te.getAtStartEffect().getNumericAssignments());
-                    temporalEffect.getAtEndEffect().getPositiveFluents().or(te.getAtEndEffect().getPositiveFluents());
-                    temporalEffect.getAtEndEffect().getNegativeFluents().or(te.getAtEndEffect().getNegativeFluents());
-                    temporalEffect.getAtEndEffect().getNumericAssignments().addAll(te.getAtEndEffect().getNumericAssignments());
-                    temporalEffect.getOverallEffect().getPositiveFluents().or(te.getOverallEffect().getPositiveFluents());
-                    temporalEffect.getOverallEffect().getNegativeFluents().or(te.getOverallEffect().getNegativeFluents());
-                    temporalEffect.getOverallEffect().getNumericAssignments().addAll(te.getOverallEffect().getNumericAssignments());
+                    temporalEffect.getAtStartEffect().getPositiveFluents()
+                        .or(te.getAtStartEffect().getPositiveFluents());
+                    temporalEffect.getAtStartEffect().getNegativeFluents()
+                        .or(te.getAtStartEffect().getNegativeFluents());
+                    temporalEffect.getAtStartEffect().getNumericAssignments()
+                        .addAll(te.getAtStartEffect().getNumericAssignments());
+                    temporalEffect.getAtEndEffect().getPositiveFluents()
+                        .or(te.getAtEndEffect().getPositiveFluents());
+                    temporalEffect.getAtEndEffect().getNegativeFluents()
+                        .or(te.getAtEndEffect().getNegativeFluents());
+                    temporalEffect.getAtEndEffect().getNumericAssignments()
+                        .addAll(te.getAtEndEffect().getNumericAssignments());
+                    temporalEffect.getOverallEffect().getPositiveFluents()
+                        .or(te.getOverallEffect().getPositiveFluents());
+                    temporalEffect.getOverallEffect().getNegativeFluents()
+                        .or(te.getOverallEffect().getNegativeFluents());
+                    temporalEffect.getOverallEffect().getNumericAssignments()
+                        .addAll(te.getOverallEffect().getNumericAssignments());
                 }
                 break;
             case TRUE:
                 // Do nothing
                 break;
             default:
-                throw new UnexpectedExpressionException(exp.getConnective().toString());
+                throw new UnexpectedExpressionException(exp.getConnector().toString());
         }
         return temporalEffect;
     }
@@ -715,9 +730,10 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      *
      * @return the expression in bit set representation.
      */
-    private List<TemporalConditionalEffect> finalizeTimeConditionalEffect(final Expression<Integer> exp) throws UnexpectedExpressionException {
-        List<TemporalConditionalEffect> effects = new ArrayList<>();
-        switch (exp.getConnective()) {
+    private List<TemporalConditionalEffect> finalizeTimeConditionalEffect(final Expression<Integer> exp)
+            throws UnexpectedExpressionException {
+        final List<TemporalConditionalEffect> effects = new ArrayList<>();
+        switch (exp.getConnector()) {
             case WHEN:
                 TemporalConditionalEffect tce = new TemporalConditionalEffect();
                 tce.setCondition(this.finalizeTimeCondition(exp.getChildren().get(0)));
@@ -740,7 +756,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 // Do nothing
                 break;
             default:
-                throw new UnexpectedExpressionException(exp.getConnective().toString());
+                throw new UnexpectedExpressionException(exp.getConnector().toString());
         }
         final TemporalConditionalEffect utce = new TemporalConditionalEffect();
         Iterator<TemporalConditionalEffect> it = effects.iterator();
@@ -748,15 +764,24 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
         while (it.hasNext()) {
             TemporalConditionalEffect tcei = it.next();
             if (tcei.getCondition().isEmpty()) {
-                utce.getEffect().getAtStartEffect().getPositiveFluents().or(tcei.getEffect().getAtStartEffect().getPositiveFluents());
-                utce.getEffect().getAtStartEffect().getNegativeFluents().or(tcei.getEffect().getAtStartEffect().getNegativeFluents());
-                utce.getEffect().getAtStartEffect().getNumericAssignments().addAll(tcei.getEffect().getAtStartEffect().getNumericAssignments());
-                utce.getEffect().getAtEndEffect().getPositiveFluents().or(tcei.getEffect().getAtEndEffect().getPositiveFluents());
-                utce.getEffect().getAtEndEffect().getNegativeFluents().or(tcei.getEffect().getAtEndEffect().getNegativeFluents());
-                utce.getEffect().getAtEndEffect().getNumericAssignments().addAll(tcei.getEffect().getAtEndEffect().getNumericAssignments());
-                utce.getEffect().getOverallEffect().getPositiveFluents().or(tcei.getEffect().getOverallEffect().getPositiveFluents());
-                utce.getEffect().getOverallEffect().getNegativeFluents().or(tcei.getEffect().getOverallEffect().getNegativeFluents());
-                utce.getEffect().getOverallEffect().getNumericAssignments().addAll(tcei.getEffect().getOverallEffect().getNumericAssignments());
+                utce.getEffect().getAtStartEffect().getPositiveFluents()
+                    .or(tcei.getEffect().getAtStartEffect().getPositiveFluents());
+                utce.getEffect().getAtStartEffect().getNegativeFluents()
+                    .or(tcei.getEffect().getAtStartEffect().getNegativeFluents());
+                utce.getEffect().getAtStartEffect().getNumericAssignments()
+                    .addAll(tcei.getEffect().getAtStartEffect().getNumericAssignments());
+                utce.getEffect().getAtEndEffect().getPositiveFluents()
+                    .or(tcei.getEffect().getAtEndEffect().getPositiveFluents());
+                utce.getEffect().getAtEndEffect().getNegativeFluents()
+                    .or(tcei.getEffect().getAtEndEffect().getNegativeFluents());
+                utce.getEffect().getAtEndEffect().getNumericAssignments()
+                    .addAll(tcei.getEffect().getAtEndEffect().getNumericAssignments());
+                utce.getEffect().getOverallEffect().getPositiveFluents()
+                    .or(tcei.getEffect().getOverallEffect().getPositiveFluents());
+                utce.getEffect().getOverallEffect().getNegativeFluents()
+                    .or(tcei.getEffect().getOverallEffect().getNegativeFluents());
+                utce.getEffect().getOverallEffect().getNumericAssignments()
+                    .addAll(tcei.getEffect().getOverallEffect().getNumericAssignments());
                 it.remove();
                 exist = true;
             }
@@ -816,7 +841,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
         final NumericVariable fluent = new NumericVariable(this.mapOfNumericFluentIndex.get(exp.getChildren().get(0)));
         final ArithmeticExpression arithmeticExpression = this.finalizeArithmeticExpression(exp.getChildren().get(1));
         NumericAssignment assignment = null;
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case ASSIGN:
                 assignment = new NumericAssignment(AssignmentOperator.ASSIGN, fluent, arithmeticExpression);
                 break;
@@ -833,7 +858,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 assignment = new NumericAssignment(AssignmentOperator.SCALE_DOWN, fluent, arithmeticExpression);
                 break;
             default:
-                throw new UnexpectedExpressionException(exp.getConnective().toString());
+                throw new UnexpectedExpressionException(exp.getConnector().toString());
         }
         return assignment;
     }
@@ -866,7 +891,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
 
         // Initialize the effects of the action
         final LinkedList<Expression<Integer>> effects = new LinkedList<>();
-        if (action.getEffects().getConnective().equals(Connector.ATOM)) {
+        if (action.getEffects().getConnector().equals(Connector.ATOM)) {
             effects.add(action.getEffects());
         } else {
             effects.addAll(action.getEffects().getChildren());
@@ -877,7 +902,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
         boolean hasUnConditionalEffects = false;
         while (!effects.isEmpty()) { //for (Expression ei : effects) {
             Expression<Integer> ei = effects.poll();
-            final Connector connective = ei.getConnective();
+            final Connector connective = ei.getConnector();
             final List<Expression<Integer>> children = ei.getChildren();
             //System.out.println("EXP " + this.toString(ei));
             switch (connective) {
@@ -950,13 +975,8 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
             encoded.setTypeOfParameter(i, action.getTypeOfParameters(i));
         }
 
-        List<NumericConstraint> duration = this.finalizeNumericConstraints(action.getDuration());
-        encoded.setDurationConstraints(duration);
-
-        // Initialize the preconditions of the action
-
+        encoded.setDuration(this.finalizeDuration(action.getDuration()));
         encoded.setPrecondition(this.finalizeTimeCondition(action.getPreconditions()));
-
         encoded.setConditionalEffects(this.finalizeTimeConditionalEffect(action.getEffects()));
 
         return encoded;
@@ -968,13 +988,13 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      */
     protected void finalizeGoal() {
 
-        if (this.getIntGoal().getConnective().equals(Connector.FALSE)) {
+        if (this.getIntGoal().getConnector().equals(Connector.FALSE)) {
             this.goal = null;
         } else {
             this.getIntGoal().toDNF();
             List<Goal> goals = new ArrayList<>(this.getIntGoal().getChildren().size());
             for (Expression<Integer> exp : this.getIntGoal().getChildren()) {
-                if (exp.getConnective().equals(Connector.ATOM)) {
+                if (exp.getConnector().equals(Connector.ATOM)) {
                     Expression<Integer> and = new Expression<>(Connector.AND);
                     and.getChildren().add(exp);
                     goals.add(new Goal(this.finalizeCondition(and)));
@@ -1021,7 +1041,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      */
     protected Condition finalizeCondition(final Expression<Integer> exp) throws UnexpectedExpressionException {
         final Condition condition = new Condition();
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case ATOM:
                 condition.getPositiveFluents().set(this.getMapOfFluentIndex().get(exp));
                 break;
@@ -1047,7 +1067,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 // do nothing
                 break;
             default:
-                throw new UnexpectedExpressionException(exp.getConnective().toString());
+                throw new UnexpectedExpressionException(exp.getConnector().toString());
         }
         return condition;
     }
@@ -1059,22 +1079,23 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      * @param exp the <code>Expression</code>.
      * @return the condition encoded.
      */
-    protected TemporalCondition finalizeTimeCondition(final Expression<Integer> exp) throws UnexpectedExpressionException {
+    protected TemporalCondition finalizeTimeCondition(final Expression<Integer> exp)
+            throws UnexpectedExpressionException {
         final TemporalCondition temporalCondition = new TemporalCondition();
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case AT_START:
             case AT_END:
             case OVER_ALL:
                 Condition condition = null;
-                if (exp.getConnective().equals(Connector.AT_START)) {
+                if (exp.getConnector().equals(Connector.AT_START)) {
                     condition = temporalCondition.getAtStartCondition();
-                } else if (exp.getConnective().equals(Connector.AT_END)) {
+                } else if (exp.getConnector().equals(Connector.AT_END)) {
                     condition = temporalCondition.getAtEndCondition();
                 } else {
                     condition = temporalCondition.getOverallCondition();
                 }
                 Expression<Integer> sub = exp.getChildren().get(0);
-                switch (sub.getConnective()) {
+                switch (sub.getConnector()) {
                     case ATOM:
                         condition.getPositiveFluents().set(this.getMapOfFluentIndex().get(sub));
                         break;
@@ -1088,20 +1109,31 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                     case EQUAL_COMPARISON:
                         condition.getNumericConstraints().add(this.encodeNumericConstraint(sub));
                         break;
+                    default:
+                        throw new UnexpectedExpressionException(sub.getConnector().getImage());
                 }
                 break;
             case AND:
                 for (Expression<Integer> e : exp.getChildren()) {
                     TemporalCondition ce = this.finalizeTimeCondition(e);
-                    temporalCondition.getAtStartCondition().getPositiveFluents().or(ce.getAtStartCondition().getPositiveFluents());
-                    temporalCondition.getAtStartCondition().getNegativeFluents().or(ce.getAtStartCondition().getNegativeFluents());
-                    temporalCondition.getAtStartCondition().getNumericConstraints().addAll(ce.getAtStartCondition().getNumericConstraints());
-                    temporalCondition.getAtEndCondition().getPositiveFluents().or(ce.getAtEndCondition().getPositiveFluents());
-                    temporalCondition.getAtEndCondition().getNegativeFluents().or(ce.getAtEndCondition().getNegativeFluents());
-                    temporalCondition.getAtEndCondition().getNumericConstraints().addAll(ce.getAtEndCondition().getNumericConstraints());
-                    temporalCondition.getOverallCondition().getPositiveFluents().or(ce.getOverallCondition().getPositiveFluents());
-                    temporalCondition.getOverallCondition().getNegativeFluents().or(ce.getOverallCondition().getNegativeFluents());
-                    temporalCondition.getOverallCondition().getNumericConstraints().addAll(ce.getOverallCondition().getNumericConstraints());
+                    temporalCondition.getAtStartCondition().getPositiveFluents()
+                        .or(ce.getAtStartCondition().getPositiveFluents());
+                    temporalCondition.getAtStartCondition().getNegativeFluents()
+                        .or(ce.getAtStartCondition().getNegativeFluents());
+                    temporalCondition.getAtStartCondition().getNumericConstraints()
+                        .addAll(ce.getAtStartCondition().getNumericConstraints());
+                    temporalCondition.getAtEndCondition().getPositiveFluents()
+                        .or(ce.getAtEndCondition().getPositiveFluents());
+                    temporalCondition.getAtEndCondition().getNegativeFluents()
+                        .or(ce.getAtEndCondition().getNegativeFluents());
+                    temporalCondition.getAtEndCondition().getNumericConstraints()
+                        .addAll(ce.getAtEndCondition().getNumericConstraints());
+                    temporalCondition.getOverallCondition().getPositiveFluents()
+                        .or(ce.getOverallCondition().getPositiveFluents());
+                    temporalCondition.getOverallCondition().getNegativeFluents()
+                        .or(ce.getOverallCondition().getNegativeFluents());
+                    temporalCondition.getOverallCondition().getNumericConstraints()
+                        .addAll(ce.getOverallCondition().getNumericConstraints());
                 }
                 break;
             case TRUE:
@@ -1124,7 +1156,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
         throws UnexpectedExpressionException {
 
         final List<NumericConstraint> constraints = new ArrayList<>();
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case AND:
                 for (Expression<Integer> e : exp.getChildren()) {
                     constraints.addAll(this.finalizeNumericConstraints(e));
@@ -1141,7 +1173,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 // do nothing
                 break;
             default:
-                throw new UnexpectedExpressionException(exp.getConnective().toString());
+                throw new UnexpectedExpressionException(exp.getConnector().toString());
         }
         return constraints;
     }
@@ -1156,7 +1188,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
         ArithmeticExpression left = this.finalizeArithmeticExpression(exp.getChildren().get(0));
         ArithmeticExpression right = this.finalizeArithmeticExpression(exp.getChildren().get(1));
         NumericConstraint constraint;
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case EQUAL_COMPARISON:
                 constraint = new NumericConstraint(NumericComparator.EQUAL, left, right);
                 break;
@@ -1173,9 +1205,28 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 constraint = new NumericConstraint(NumericComparator.GREATER_OR_EQUAL, left, right);
                 break;
             default:
-                throw new UnexpectedExpressionException(exp.getConnective().toString());
+                throw new UnexpectedExpressionException(exp.getConnector().toString());
         }
         return constraint;
+    }
+
+    /**
+     * Encodes the duration of an action or a method.
+     *
+     * @param exp the expression to encode.
+     */
+    private NumericVariable finalizeDuration(final Expression<Integer> exp) {
+        this.toString(exp);
+        NumericVariable duration = new NumericVariable(NumericVariable.DURATION);
+        if (exp.getConnector().equals(Connector.EQUAL_COMPARISON)
+                && exp.getChildren().size() == 2
+                && exp.getChildren().get(0).getConnector().equals(Connector.TIME_VAR)
+                && exp.getChildren().get(1).getConnector().equals(Connector.NUMBER)) {
+            duration.setValue(exp.getChildren().get(1).getValue());
+        } else {
+            throw new UnexpectedExpressionException(exp.getConnector().toString());
+        }
+        return duration;
     }
 
     /**
@@ -1187,7 +1238,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
         ArithmeticExpression arithmeticExpression;
         ArithmeticExpression left;
         ArithmeticExpression right;
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case PLUS:
                 left = this.finalizeArithmeticExpression(exp.getChildren().get(0));
                 right = this.finalizeArithmeticExpression(exp.getChildren().get(1));
@@ -1225,7 +1276,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 arithmeticExpression = new NumericVariable(NumericVariable.DURATION);
                 break;
             default:
-                throw new UnexpectedExpressionException(exp.getConnective().toString());
+                throw new UnexpectedExpressionException(exp.getConnector().toString());
         }
         return arithmeticExpression;
     }
@@ -1237,7 +1288,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
     protected void finalizeInitialState() {
         this.initialState = new InitialState();
         for (final Expression<Integer> fact : this.getIntInitialState()) {
-            switch (fact.getConnective()) {
+            switch (fact.getConnector()) {
                 case ATOM:
                     Integer i = this.mapOfFluentIndex.get(fact);
                     if (i != null) {
@@ -1315,47 +1366,25 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
         str.append("Duration:\n");
         str.append(this.toString(action.getDuration()));
         str.append("\nDuration constraints:");
-        for (NumericConstraint constraints : action.getDurationConstraints()) {
-            str.append("  ");
-            str.append(this.toString(constraints));
-            str.append("\n");
+        if (action.getDurationConstraints().isEmpty()) {
+            str.append("()\n");
+        } else {
+            for (NumericConstraint constraints : action.getDurationConstraints()) {
+                str.append("  ");
+                str.append(this.toString(constraints));
+                str.append("\n");
+            }
         }
         str.append("Condition:\n");
         str.append(this.toString(action.getPrecondition()));
         str.append("\n");
         str.append("Effects:\n");
-        for (TemporalConditionalEffect effect : action.getConditionalEffects()) {
-            str.append(this.toString(effect));
-            str.append("\n");
-        }
-        return str.toString();
-    }
-
-    /**
-     * Returns a string representation of a the instantiation of an operator.
-     *
-     * @param operator the operator.
-     * @return a string representation of the instantiation of the specified operator.
-     */
-    private final String toStringInstantiations(final Operator operator) {
-        StringBuilder str = new StringBuilder();
-        for (int i = 0; i < operator.arity(); i++) {
-            final int index = operator.getValueOfParameter(i);
-            final String type = this.getTypes().get(operator.getTypeOfParameters(i));
-            if (index == -1) {
-                str.append(Symbol.DEFAULT_VARIABLE_SYMBOL);
-                str.append(i);
-                str.append(" - ");
-                str.append(type);
-                str.append(" : ? \n");
-            } else {
-                str.append(Symbol.DEFAULT_VARIABLE_SYMBOL);
-                str.append(i);
-                str.append(" - ");
-                str.append(type);
-                str.append(" : ");
-                str.append(this.getConstantSymbols().get(index));
-                str.append(" \n");
+        if (action.getConditionalEffects().isEmpty()) {
+            str.append("(and )");
+        } else {
+            for (TemporalConditionalEffect effect : action.getConditionalEffects()) {
+                str.append(this.toString(effect));
+                str.append("\n");
             }
         }
         return str.toString();
@@ -1368,18 +1397,28 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      * @return a string representation of the state.
      */
     public final String toString(final Condition state) {
-        final StringBuilder str = new StringBuilder("(and");
+        if (state.isEmpty()) {
+            return "()";
+        }
+        boolean printed = false;
+        final StringBuilder str = new StringBuilder("(and ");
+
         final BitSet positive = state.getPositiveFluents();
         for (int j = positive.nextSetBit(0); j >= 0; j = positive.nextSetBit(j + 1)) {
-            str.append(" ");
             str.append(this.toString(this.getFluents().get(j)));
-            str.append("\n");
+            str.append("\n  ");
+            printed = true;
         }
         final BitSet negative = state.getNegativeFluents();
+
         for (int i = negative.nextSetBit(0); i >= 0; i = negative.nextSetBit(i + 1)) {
-            str.append(" (not ");
+            str.append("(not ");
             str.append(this.toString(this.getFluents().get(i)));
-            str.append(")\n");
+            str.append("\n              ");
+            printed = true;
+        }
+        if (printed) {
+            str.setLength(str.length() - 3);
         }
         str.append(")");
         return str.toString();
@@ -1395,24 +1434,25 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
         final StringBuilder str = new StringBuilder("(and\n");
         final Condition atStart = condition.getAtStartCondition();
         if (!atStart.isEmpty()) {
-            str.append("  (at start ");
+            str.append(" (at start ");
             str.append(this.toString(atStart));
-            str.append("  )");
+            str.append(")\n");
         }
         final Condition atEnd = condition.getAtEndCondition();
         if (!atEnd.isEmpty()) {
-            str.append("  (at end ");
+            str.append(" (at end ");
             str.append(this.toString(atEnd));
-            str.append("   )");
+            str.append(")\n");
         }
         final Condition overall = condition.getOverallCondition();
         if (!overall.isEmpty()) {
-            str.append("  (overall ");
-            str.append(this.toString(atEnd));
-            str.append("   )");
+            str.append(" (overall ");
+            str.append(this.toString(overall));
+            str.append(")\n");
         }
         str.append(")");
         return str.toString();
+
     }
 
     /**
@@ -1462,22 +1502,28 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      * @return a string representation of the effect.
      */
     public final String toString(final Effect effect) {
-        final StringBuilder str = new StringBuilder("(and");
+        boolean printed = false;
+        final StringBuilder str = new StringBuilder("(and ");
         final BitSet positive = effect.getPositiveFluents();
         for (int j = positive.nextSetBit(0); j >= 0; j = positive.nextSetBit(j + 1)) {
-            str.append(" ");
             str.append(this.toString(this.getFluents().get(j)));
-            str.append("\n");
+            str.append("\n  ");
+            printed = true;
         }
         final BitSet negative = effect.getNegativeFluents();
         for (int i = negative.nextSetBit(0); i >= 0; i = negative.nextSetBit(i + 1)) {
-            str.append(" (not ");
+            str.append("(not ");
             str.append(this.toString(this.getFluents().get(i)));
-            str.append(")\n");
+            str.append("\n  ");
+            printed = true;
         }
         for (NumericAssignment assignment : effect.getNumericAssignments()) {
             str.append(this.toString(assignment));
-            str.append("\n");
+            str.append("\n  ");
+            printed = true;
+         }
+        if (printed) {
+            str.setLength(str.length() - 3);
         }
         str.append(")");
         return str.toString();
@@ -1491,15 +1537,23 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      */
     public final String toString(final TemporalEffect effect) {
         final StringBuilder str = new StringBuilder("(and\n");
-        str.append("  (at start ");
-        str.append(this.toString(effect.getAtStartEffect()));
-        str.append("  )\n");
-        str.append("  (at end ");
-        str.append(this.toString(effect.getAtEndEffect()));
-        str.append("  )\n");
-        str.append("  (overall ");
-        str.append(this.toString(effect.getOverallEffect()));
-        str.append("  )\n");
+        if (!effect.getAtStartEffect().isEmpty()) {
+            str.append(" (at start ");
+            str.append(this.toString(effect.getAtStartEffect()));
+            str.append(")\n");
+        }
+        if (!effect.getAtEndEffect().isEmpty()) {
+            str.append(" (at end ");
+            str.append(this.toString(effect.getAtEndEffect()));
+            str.append(")\n");
+        }
+        if (!effect.getOverallEffect().isEmpty()) {
+            str.append(" (overall ");
+            System.out.println(effect.getOverallEffect().isEmpty());
+            System.out.println(effect.getOverallEffect());
+            str.append(this.toString(effect.getOverallEffect()));
+            str.append(")\n");
+        }
         str.append(")");
         return str.toString();
     }
@@ -1670,7 +1724,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
         str.append("Preconditions:\n");
         str.append(this.toString(method.getPrecondition()));
         str.append("\n");
-        str.append("Ordering:\n");
+        str.append("Ordering constraints:\n");
         str.append(method.getOrderingConstraints().toString());
         str.append("\n");
         str.append("Before constraints:\n");
@@ -1902,11 +1956,11 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
     }
 
     /**
-    * Returns a string representation of a numeric constraints
+     * Returns a string representation of a numeric constraints.
      *
      * @param constraint the numeric constraints.
      * @return the string representation of the specified numeric constraint.
-        */
+     */
     public String toString(final NumericConstraint constraint) {
         final StringBuilder str = new StringBuilder();
         final ArithmeticExpression left = constraint.getLeftExpression();
@@ -1935,7 +1989,11 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 break;
             case VARIABLE:
                 str.append("(= ");
-                str.append(this.getNumericFluents().get(expression.getNumericFluent()));
+                if (expression.getNumericFluent() == NumericVariable.DURATION) {
+                    str.append("?duration");
+                } else  {
+                    str.append(this.getNumericFluents().get(expression.getNumericFluent()));
+                }
                 str.append(" ");
                 str.append(expression.getValue());
                 str.append(")");
@@ -1961,8 +2019,12 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                         str.append(this.toString(expression.getRightExpression()));
                         str.append(")");
                         break;
+                    default:
+                        throw new UnexpectedExpressionException(expression.getArithmeticOperator().toString());
                 }
                 break;
+            default:
+                throw new UnexpectedExpressionException(expression.getType().toString());
         }
 
         return str.toString();
@@ -1998,15 +2060,59 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 }
                 break;
             case ACTIONS:
-                for (Action action : this.getActions()) {
-                    str.append(this.toString(action));
+                str.append("**********************************\n");
+                str.append("* Actions                        *\n");
+                str.append("**********************************\n\n");
+                if (this.getActions().isEmpty()) {
+                    str.append("no actions");
                     str.append(System.lineSeparator());
+                } else {
+                    for (Action action : this.getActions()) {
+                        str.append(this.toString(action));
+                        str.append(System.lineSeparator());
+                    }
+                }
+                break;
+            case DURATIVE_ACTIONS:
+                str.append("**********************************\n");
+                str.append("* Durative Actions               *\n");
+                str.append("**********************************\n\n");
+                if (this.getDurativeActions().isEmpty()) {
+                    str.append("no durative actions");
+                    str.append(System.lineSeparator());
+                } else {
+                    for (DurativeAction action : this.getDurativeActions()) {
+                        str.append(this.toString(action));
+                        str.append(System.lineSeparator());
+                    }
                 }
                 break;
             case METHODS:
-                for (Method method : this.getMethods()) {
-                    str.append(this.toString(method));
+                str.append("**********************************\n");
+                str.append("* Methods                        *\n");
+                str.append("**********************************\n\n");
+                if (this.getMethods().isEmpty()) {
+                    str.append("no methods");
                     str.append(System.lineSeparator());
+                } else {
+                    for (Method method : this.getMethods()) {
+                        str.append(this.toString(method));
+                        str.append(System.lineSeparator());
+                    }
+                }
+                break;
+            case DURATIVE_METHODS:
+                str.append("**********************************\n");
+                str.append("* Durative Methods               *\n");
+                str.append("**********************************\n\n");
+                if (this.getDurativeMethods().isEmpty()) {
+                    str.append("no durative methods");
+                    str.append(System.lineSeparator());
+                } else {
+                    for (DurativeMethod method : this.getDurativeMethods()) {
+                        str.append(this.toString(method));
+                        str.append(System.lineSeparator());
+                    }
                 }
                 break;
             case GOAL:
@@ -2050,6 +2156,36 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 break;
             default:
                 return super.toString(data);
+        }
+        return str.toString();
+    }
+
+    /**
+     * Returns a string representation of a the instantiation of an operator.
+     *
+     * @param operator the operator.
+     * @return a string representation of the instantiation of the specified operator.
+     */
+    private final String toStringInstantiations(final Operator operator) {
+        StringBuilder str = new StringBuilder();
+        for (int i = 0; i < operator.arity(); i++) {
+            final int index = operator.getValueOfParameter(i);
+            final String type = this.getTypes().get(operator.getTypeOfParameters(i));
+            if (index == -1) {
+                str.append(Symbol.DEFAULT_VARIABLE_SYMBOL);
+                str.append(i);
+                str.append(" - ");
+                str.append(type);
+                str.append(" : ? \n");
+            } else {
+                str.append(Symbol.DEFAULT_VARIABLE_SYMBOL);
+                str.append(i);
+                str.append(" - ");
+                str.append(type);
+                str.append(" : ");
+                str.append(this.getConstantSymbols().get(index));
+                str.append(" \n");
+            }
         }
         return str.toString();
     }
@@ -2169,38 +2305,37 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      * Encode a list of specified methods into the final compact representation. The specified
      * maps are used to speed-up the search by mapping the an expression to this index.
      */
-    protected void finalizeMethods() throws UnexpectedExpressionException {
+    protected void finalizeMethods() {
         this.methods = new ArrayList<>(this.getIntMethods().size());
+        this.durativeMethods = new ArrayList<>(this.getIntMethods().size());
         int methodIndex = this.getRelevantActions().size();
         for (IntMethod intMethod : this.getIntMethods()) {
             List<IntMethod> normalized = this.normalizeMethod(intMethod);
             for (int i = 0; i < normalized.size(); i++) {
-                IntMethod nm = normalized.get(i);
+                final IntMethod nm = normalized.get(i);
                 if (!nm.isDurative()) {
-                    if (i != 0) this.getTaskResolvers().get(methodIndex).add(methods.size());
-                    this.methods.add(this.finalizeMethod(nm, this.getMapOfFluentIndex(), this.mapOfTasksIndex));
+                    if (i != 0) {
+                        this.getTaskResolvers().get(methodIndex).add(methods.size());
+                    }
+                    this.methods.add(this.finalizeMethod(nm));
                 } else {
-                    if (i != 0) this.getTaskResolvers().get(methodIndex).add(-this.durativeMethods.size() - 1);
-                    this.durativeMethods.add(this.finalizeDurativeMethod(nm, this.getMapOfFluentIndex(), this.mapOfTasksIndex));
+                    if (i != 0) {
+                        this.getTaskResolvers().get(methodIndex).add(-this.durativeMethods.size() - 1);
+                    }
+                    this.durativeMethods.add(this.finalizeDurativeMethod(nm));
                 }
             }
             methodIndex++;
         }
     }
 
-
-
     /**
-     * Encode a list of specified methods into the final compact representation. The specified
-     * maps are used to speed-up the search by mapping the an expression to this index.
+     * Encode a list of specified methods into the final compact representation.
      *
      * @param method the list of methods to encode.
-     * @param factMap the map that associates at a specified fact its index in the table of relevant fluents.
-     * @param taskMap the map that associates at a specified task its index in the table of relevant tasks.
      * @return the list of methods encoded into final compact representation.
      */
-    private Method finalizeMethod(final IntMethod method, final Map<Expression<Integer>, Integer> factMap,
-                                  final Map<Expression<Integer>, Integer> taskMap) throws UnexpectedExpressionException {
+    private Method finalizeMethod(final IntMethod method) throws UnexpectedExpressionException {
 
         final int arity = method.arity();
         final Method encoded = new Method(method.getName(), arity);
@@ -2210,7 +2345,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
             encoded.setTypeOfParameter(i, method.getTypeOfParameters(i));
         }
         // Encode the task carried out by the method
-        encoded.setTask(taskMap.get(method.getTask()));
+        encoded.setTask(this.mapOfTasksIndex.get(method.getTask()));
         // Encode the preconditions of the method
         encoded.setPrecondition(this.finalizeCondition(method.getPreconditions()));
         // Encode the task network of the method
@@ -2219,16 +2354,12 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
     }
 
     /**
-     * Encode a list of specified methods into the final compact representation. The specified
-     * maps are used to speed-up the search by mapping the an expression to this index.
+     * Encode a list of specified methods into the final compact representation.
      *
      * @param method the list of methods to encode.
-     * @param factMap the map that associates at a specified fact its index in the table of relevant fluents.
-     * @param taskMap the map that associates at a specified task its index in the table of relevant tasks.
      * @return the list of methods encoded into final compact representation.
      */
-    private DurativeMethod finalizeDurativeMethod(final IntMethod method, final Map<Expression<Integer>, Integer> factMap,
-                                  final Map<Expression<Integer>, Integer> taskMap) throws UnexpectedExpressionException {
+    private DurativeMethod finalizeDurativeMethod(final IntMethod method) throws UnexpectedExpressionException {
 
         final int arity = method.arity();
         final DurativeMethod encoded = new DurativeMethod(method.getName(), arity);
@@ -2238,10 +2369,9 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
             encoded.setTypeOfParameter(i, method.getTypeOfParameters(i));
         }
         // Encode the duration constrains of the method
-        List<NumericConstraint> constraints = this.finalizeNumericConstraints(method.getDuration());
-        encoded.setDurationConstraints(constraints);
+        encoded.setDuration(this.finalizeDuration(method.getDuration()));
         // Encode the task carried out by the method
-        encoded.setTask(taskMap.get(method.getTask()));
+        encoded.setTask(this.mapOfTasksIndex.get(method.getTask()));
         // Encode the preconditions of the method
         encoded.setPrecondition(this.finalizeTimeCondition(method.getPreconditions()));
         // Encode the task network of the method
@@ -2266,35 +2396,34 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
             ordering.set(c.getChildren().get(0).getTaskID().getValue(),
                 c.getChildren().get(1).getTaskID().getValue());
         }
+        ordering.transitiveClosure();
         final TaskNetwork tn = new TaskNetwork(tasks, ordering);
-        tn.transitiveClosure();
 
         for (Expression<Integer> e: taskNetwork.getConstraints()) {
-            if (e.getConnective().equals(Connector.HOLD_BEFORE_METHOD_CONSTRAINT)) {
+            if (e.getConnector().equals(Connector.HOLD_BEFORE_METHOD_CONSTRAINT)) {
                 final Symbol<Integer> task = e.getChildren().get(0).getTaskID();
                 final Condition before = tn.getBeforeConstraints(task.getValue());
                 final Expression<Integer> se = e.getChildren().get(1);
-                if (se.getConnective().equals(Connector.NOT)) {
+                if (se.getConnector().equals(Connector.NOT)) {
                     before.getNegativeFluents().set(this.mapOfFluentIndex.get(se.getChildren().get(0)));
                 } else {
                     before.getPositiveFluents().set(this.mapOfFluentIndex.get(se));
                 }
-            } else if (e.getConnective().equals(Connector.HOLD_AFTER_METHOD_CONSTRAINT)) {
+            } else if (e.getConnector().equals(Connector.HOLD_AFTER_METHOD_CONSTRAINT)) {
                 final Symbol<Integer> task = e.getChildren().get(0).getTaskID();
                 final Condition after = tn.getAfterConstraints(task.getValue());
                 final Expression<Integer> se = e.getChildren().get(1);
-                if (se.getConnective().equals(Connector.NOT)) {
+                if (se.getConnector().equals(Connector.NOT)) {
                     after.getNegativeFluents().set(this.mapOfFluentIndex.get(se.getChildren().get(0)));
                 } else {
                     after.getPositiveFluents().set(this.mapOfFluentIndex.get(se));
                 }
-            } else { // Between
-                System.out.println(this.toString(e));
+            } else if (e.getConnector().equals(Connector.HOLD_BETWEEN_METHOD_CONSTRAINT)) {
                 final Symbol<Integer> task1 = e.getChildren().get(0).getTaskID();
                 final Symbol<Integer> task2 = e.getChildren().get(1).getTaskID();
                 final Condition between = tn.getBetweenConstraints(task1.getValue(), task2.getValue());
                 final Expression<Integer> se = e.getChildren().get(2);
-                if (se.getConnective().equals(Connector.NOT)) {
+                if (se.getConnector().equals(Connector.NOT)) {
                     between.getNegativeFluents().set(this.mapOfFluentIndex.get(se.getChildren().get(0)));
                 } else {
                     between.getPositiveFluents().set(this.mapOfFluentIndex.get(se));
@@ -2312,12 +2441,12 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      * @return the task network into its final bit set representation.
      * @see TaskNetwork
      */
-    private TemporalTaskNetwork finalizeTemporalTaskNetwork(IntTaskNetwork taskNetwork) {
+    private TaskNetwork finalizeTemporalTaskNetwork(IntTaskNetwork taskNetwork) {
         // We encode first the tasks
         final List<Integer> tasks = new ArrayList<Integer>();
         this.encodeTasks(taskNetwork.getTasks(), tasks);
         // We encode then the ordering constraints
-        final SimpleTemporalNetwork stn = new SimpleTemporalNetwork(tasks.size());
+        final TemporalOrderingConstraintNetwork stn = new TemporalOrderingConstraintNetwork(tasks.size());
 
         for (Expression<Integer> tc : taskNetwork.getOrderingConstraints().getChildren()) {
             if (tc.equals(Connector.LESS_ORDERING_CONSTRAINT)) {
@@ -2347,24 +2476,24 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 stn.set(task1, task2, TemporalRelation.DIFFERENT);
             }
         }
-        final TemporalTaskNetwork tn = new TemporalTaskNetwork(tasks, stn);
-        tn.transitiveClosure();
+        stn.transitiveClosure();
+        final TaskNetwork tn = new TaskNetwork(tasks, stn);
 
         for (Expression<Integer> e: taskNetwork.getConstraints()) {
-            if (e.getConnective().equals(Connector.HOLD_BEFORE_METHOD_CONSTRAINT)) {
+            if (e.getConnector().equals(Connector.HOLD_BEFORE_METHOD_CONSTRAINT)) {
                 final Symbol<Integer> task = e.getChildren().get(0).getTaskID();
                 final Condition before = tn.getBeforeConstraints(task.getValue());
                 final Expression<Integer> se = e.getChildren().get(1);
-                if (se.getConnective().equals(Connector.NOT)) {
+                if (se.getConnector().equals(Connector.NOT)) {
                     before.getNegativeFluents().set(this.mapOfFluentIndex.get(se.getChildren().get(0)));
                 } else {
                     before.getPositiveFluents().set(this.mapOfFluentIndex.get(se));
                 }
-            } else if (e.getConnective().equals(Connector.HOLD_AFTER_METHOD_CONSTRAINT)) {
+            } else if (e.getConnector().equals(Connector.HOLD_AFTER_METHOD_CONSTRAINT)) {
                 final Symbol<Integer> task = e.getChildren().get(0).getTaskID();
                 final Condition after = tn.getAfterConstraints(task.getValue());
                 final Expression<Integer> se = e.getChildren().get(1);
-                if (se.getConnective().equals(Connector.NOT)) {
+                if (se.getConnector().equals(Connector.NOT)) {
                     after.getNegativeFluents().set(this.mapOfFluentIndex.get(se.getChildren().get(0)));
                 } else {
                     after.getPositiveFluents().set(this.mapOfFluentIndex.get(se));
@@ -2374,7 +2503,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
                 final Symbol<Integer> task2 = e.getChildren().get(1).getTaskID();
                 final Condition between = tn.getBetweenConstraints(task1.getValue(), task2.getValue());
                 final Expression<Integer> se = e.getChildren().get(2);
-                if (se.getConnective().equals(Connector.NOT)) {
+                if (se.getConnector().equals(Connector.NOT)) {
                     between.getNegativeFluents().set(this.mapOfFluentIndex.get(se.getChildren().get(0)));
                 } else {
                     between.getPositiveFluents().set(this.mapOfFluentIndex.get(se));
@@ -2426,7 +2555,7 @@ public abstract class FinalizedProblem extends PostInstantiatedProblem {
      * @param tasks the list of task encoded as integer.
      */
     private void encodeTasks(Expression<Integer> exp, List<Integer> tasks) {
-        switch (exp.getConnective()) {
+        switch (exp.getConnector()) {
             case TASK:
                 tasks.add(this.mapOfTasksIndex.get(exp));
                 break;
