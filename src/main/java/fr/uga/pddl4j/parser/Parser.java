@@ -169,6 +169,11 @@ public final class Parser implements Callable<Integer> {
     private File problemExportFile;
 
     /**
+     * The XML exported problem file.
+     */
+    private File domainExportFile;
+
+    /**
      * Create a new <code>Parser</code>.
      */
     public Parser() {
@@ -196,6 +201,24 @@ public final class Parser implements Callable<Integer> {
     }
 
     /**
+     * Returns the file to export the domain in XML.
+     *
+     * @return the file to export the domain in XML.
+     */
+    public final File getDomainExportFile() {
+        return this.domainExportFile;
+    }
+
+    /**
+     * Returns the file to export the problem in XML.
+     *
+     * @return the file to export the problem in XML.
+     */
+    public final File getProblemExportFile() {
+        return this.problemExportFile;
+    }
+
+    /**
      * Sets the problem file to parse.
      *
      * @param problem the problem file to parse.
@@ -203,6 +226,26 @@ public final class Parser implements Callable<Integer> {
     @CommandLine.Parameters(index = "1", description = "The problem file.")
     public final void setProblemFile(final File problem) {
         this.problemFile = problem;
+    }
+
+    /**
+     *  Sets the file to export the domain in XML.
+     *
+     * @param domain the file to export the domain in XML.
+     */
+    @CommandLine.Parameters(index = "2", description = "The domain export file.")
+    public final void setDomainExportFile(final File domain) {
+        this.domainExportFile = domain;
+    }
+
+    /**
+     * Sets the file to export the problem in XML.
+     *
+     * @param domain the file to export the problem in XML.
+     */
+    @CommandLine.Parameters(index = "3", description = "The problem export file.")
+    public final void setProblemExportFile(final File domain) {
+        this.problemExportFile = domain;
     }
 
     /**
